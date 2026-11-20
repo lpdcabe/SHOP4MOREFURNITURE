@@ -8,7 +8,7 @@ import dashboardRouter from './routes/dashboard.js';
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors({ origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173' }));
+app.use(cors({ origin: process.env.CLIENT_ORIGIN || true }));
 app.use(express.json());
 
 // Health check (also verifies Supabase connectivity)
