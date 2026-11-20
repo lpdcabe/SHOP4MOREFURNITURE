@@ -19,12 +19,14 @@ const HeaderContext = createContext(null);
 export function AppShell() {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [filterModalOpen, setFilterModalOpen] = useState(false);
   const menuRef = useRef(null);
   const [header, setHeader] = useState({
     title: '',
     searchValue: '',
     onSearchChange: null,
-    searchPlaceholder: 'Search...'
+    searchPlaceholder: 'Search...',
+    filters: []
   });
 
   let user = { name: 'Admin', username: 'administrator', email: 'shop4more@email.com' };
@@ -51,6 +53,12 @@ export function AppShell() {
     localStorage.removeItem('shop4more_user');
     setMenuOpen(false);
     navigate('/');
+  };
+
+  const activeFilterCount = (header.filters || []).filter((f) => f.value && f.value !== 'All').length;
+
+  const handleResetFilters = () => {
+    (header.filters || []).forEach((f) => f.onChange?.('All'));
   };
 
   return (
@@ -85,6 +93,20 @@ export function AppShell() {
             <h2 className="mb-0">{header.title}</h2>
 
             <div className="app-header-right">
+              {header.filters && header.filters.length > 0 && (
+                <button
+                  type="button"
+                  className={`header-filter-btn ${activeFilterCount > 0 ? 'has-active' : ''}`}
+                  onClick={() => setFilterModalOpen(true)}
+                >
+                  <i className="fas fa-filter" />
+                  <span>Filter</span>
+                  {activeFilterCount > 0 && (
+                    <span className="filter-count-badge">{activeFilterCount}</span>
+                  )}
+                </button>
+              )}
+
               {typeof header.onSearchChange === 'function' && (
                 <div className="search">
                   <input
@@ -146,6 +168,64 @@ export function AppShell() {
           </div>
         </main>
       </div>
+
+      {filterModalOpen && (
+        <div className="modal-backdrop-custom">
+          <div className="modal-card-custom" style={{ maxWidth: '440px' }}>
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h5 className="mb-0">
+                <i className="fas fa-filter me-2" />
+                Filters
+              </h5>
+              <button
+                type="button"
+                className="btn-close"
+                onClick={() => setFilterModalOpen(false)}
+              />
+            </div>
+
+            <div className="d-flex flex-column gap-3">
+              {(header.filters || []).map((f) => (
+                <div key={f.label}>
+                  <label className="form-label fw-semibold mb-2">{f.label}</label>
+                  <div className="filter-chip-group">
+                    {(f.options || []).map((opt) => {
+                      const isActive = f.value === opt;
+                      return (
+                        <button
+                          key={opt}
+                          type="button"
+                          className={`filter-chip ${isActive ? 'active' : ''}`}
+                          onClick={() => f.onChange(opt)}
+                        >
+                          {opt === 'All' ? `All ${f.label}` : opt}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="d-flex justify-content-between align-items-center mt-4">
+              <button
+                type="button"
+                className="btn btn-outline-secondary"
+                onClick={handleResetFilters}
+              >
+                Reset
+              </button>
+              <button
+                type="button"
+                className="btn btn-maroon"
+                onClick={() => setFilterModalOpen(false)}
+              >
+                Apply Filters
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </HeaderContext.Provider>
   );
 }
@@ -155,15 +235,16 @@ export default function Layout({
   searchValue = '',
   onSearchChange = null,
   searchPlaceholder = 'Search...',
+  filters = [],
   children
 }) {
   const setHeader = useContext(HeaderContext);
 
   useEffect(() => {
     if (setHeader) {
-      setHeader({ title, searchValue, onSearchChange, searchPlaceholder });
+      setHeader({ title, searchValue, onSearchChange, searchPlaceholder, filters });
     }
-  }, [setHeader, title, searchValue, onSearchChange, searchPlaceholder]);
+  }, [setHeader, title, searchValue, onSearchChange, searchPlaceholder, filters]);
 
   return <>{children}</>;
 }

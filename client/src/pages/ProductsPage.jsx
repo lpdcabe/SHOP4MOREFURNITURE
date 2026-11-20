@@ -7,6 +7,8 @@ export default function ProductsPage() {
   const [products, setProducts] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState('All');
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [error, setError] = useState('');
@@ -26,12 +28,23 @@ export default function ProductsPage() {
     loadData();
   }, []);
 
+  const categories = useMemo(() => {
+    const set = new Set(products.map((p) => p.category).filter(Boolean));
+    return ['All', ...Array.from(set)];
+  }, [products]);
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    return products.filter((p) =>
-      `${p.code} ${p.name} ${p.category} ${p.supplier_name}`.toLowerCase().includes(q)
-    );
-  }, [products, search]);
+    return products.filter((p) => {
+      const matchesSearch = `${p.code} ${p.name} ${p.category} ${p.supplier_name}`
+        .toLowerCase()
+        .includes(q);
+      const matchesCategory = categoryFilter === 'All' || p.category === categoryFilter;
+      const badgeLabel = getStockBadge(p.stock, p.reorder_level).label;
+      const matchesStatus = statusFilter === 'All' || badgeLabel === statusFilter;
+      return matchesSearch && matchesCategory && matchesStatus;
+    });
+  }, [products, search, categoryFilter, statusFilter]);
 
   const handleSave = async (payload) => {
     if (editing) {
@@ -48,12 +61,26 @@ export default function ProductsPage() {
     await loadData();
   };
 
+  const pageFilters = useMemo(
+    () => [
+      { label: 'Category', value: categoryFilter, onChange: setCategoryFilter, options: categories },
+      {
+        label: 'Status',
+        value: statusFilter,
+        onChange: setStatusFilter,
+        options: ['All', 'In Stock', 'Low Stock', 'Out of Stock']
+      }
+    ],
+    [categoryFilter, statusFilter, categories]
+  );
+
   return (
     <Layout
       title="Products"
       searchValue={search}
       onSearchChange={setSearch}
       searchPlaceholder="Search Product"
+      filters={pageFilters}
     >
       {error && <div className="alert alert-warning">{error}</div>}
 
@@ -79,6 +106,8 @@ export default function ProductsPage() {
                 <th>Code</th>
                 <th>Product Name</th>
                 <th>Category</th>
+                <th>Size / Spec</th>
+                <th>Type</th>
                 <th>Supplier</th>
                 <th>Price</th>
                 <th>Stock</th>
@@ -94,6 +123,8 @@ export default function ProductsPage() {
                     <td>{p.code}</td>
                     <td>{p.name}</td>
                     <td>{p.category}</td>
+                    <td>{p.size_spec || '—'}</td>
+                    <td>{p.item_type || '—'}</td>
                     <td>{p.supplier_name}</td>
                     <td>{formatPeso(p.price)}</td>
                     <td>{p.stock}</td>
@@ -122,7 +153,7 @@ export default function ProductsPage() {
               })}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan="8" className="text-center text-muted py-4">
+                  <td colSpan="10" className="text-center text-muted py-4">
                     No products found.
                   </td>
                 </tr>
@@ -135,6 +166,7 @@ export default function ProductsPage() {
       <ProductModal
         show={showModal}
         initialData={editing}
+        products={products}
         suppliers={suppliers}
         onClose={() => setShowModal(false)}
         onSave={handleSave}

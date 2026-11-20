@@ -3,8 +3,9 @@ import { useState, useEffect } from 'react';
 const EMPTY = {
   code: '',
   name: '',
-  category: 'Living Room',
+  category: 'Sofas',
   size_spec: '',
+  item_type: '',
   supplier_name: '',
   price: '',
   stock: '',
@@ -12,7 +13,27 @@ const EMPTY = {
   annual_sales: 0
 };
 
-export default function ProductModal({ show, initialData, suppliers = [], onClose, onSave }) {
+function getNextProductCode(products = []) {
+  let maxNum = 0;
+  for (const p of products) {
+    const match = String(p.code || '').match(/(\d+)$/);
+    if (match) {
+      const n = Number(match[1]);
+      if (n > maxNum) maxNum = n;
+    }
+  }
+  const next = Math.max(maxNum + 1, products.length + 1);
+  return `P${String(next).padStart(3, '0')}`;
+}
+
+export default function ProductModal({
+  show,
+  initialData,
+  products = [],
+  suppliers = [],
+  onClose,
+  onSave
+}) {
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -23,11 +44,12 @@ export default function ProductModal({ show, initialData, suppliers = [], onClos
     } else {
       setForm({
         ...EMPTY,
+        code: getNextProductCode(products),
         supplier_name: suppliers[0]?.company_name || 'ABC Furniture'
       });
     }
     setError('');
-  }, [initialData, show, suppliers]);
+  }, [initialData, show, suppliers, products]);
 
   if (!show) return null;
 
@@ -41,6 +63,7 @@ export default function ProductModal({ show, initialData, suppliers = [], onClos
         name: form.name.trim(),
         category: form.category.trim(),
         size_spec: (form.size_spec || '').trim(),
+        item_type: (form.item_type || '').trim(),
         supplier_name: form.supplier_name.trim(),
         price: Number(form.price) || 0,
         stock: Number(form.stock) || 0,
@@ -67,17 +90,18 @@ export default function ProductModal({ show, initialData, suppliers = [], onClos
 
         <form onSubmit={handleSubmit}>
           <div className="row g-3">
-            <div className="col-md-4">
-              <label className="form-label">Code</label>
-              <input
-                className="form-control"
-                required
-                placeholder="e.g. P008"
-                value={form.code}
-                onChange={(e) => setForm({ ...form, code: e.target.value })}
-              />
-            </div>
-            <div className="col-md-8">
+            {initialData && (
+              <div className="col-md-4">
+                <label className="form-label">Code</label>
+                <input
+                  className="form-control bg-light"
+                  value={form.code}
+                  readOnly
+                  disabled
+                />
+              </div>
+            )}
+            <div className={initialData ? 'col-md-8' : 'col-12'}>
               <label className="form-label">Product Name</label>
               <input
                 className="form-control"
@@ -86,7 +110,7 @@ export default function ProductModal({ show, initialData, suppliers = [], onClos
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
               />
             </div>
-            <div className="col-md-6">
+            <div className="col-md-4">
               <label className="form-label">Category</label>
               <input
                 className="form-control"
@@ -96,21 +120,33 @@ export default function ProductModal({ show, initialData, suppliers = [], onClos
                 onChange={(e) => setForm({ ...form, category: e.target.value })}
               />
               <datalist id="category-options">
-                <option value="Living Room" />
                 <option value="Sofas" />
-                <option value="Dining" />
-                <option value="Bedroom" />
-                <option value="Office" />
-                <option value="Storage" />
+                <option value="Beds" />
+                <option value="Dining Sets" />
+                <option value="Cabinets" />
+                <option value="Wardrobes" />
+                <option value="Tables" />
+                <option value="Chairs" />
+                <option value="TV Racks" />
+                <option value="Office Furniture" />
               </datalist>
             </div>
-            <div className="col-md-6">
+            <div className="col-md-4">
               <label className="form-label">Size / Spec</label>
               <input
                 className="form-control"
-                placeholder="e.g. 321, U-Shape"
+                placeholder="e.g. 60 x 75, 6 seater"
                 value={form.size_spec || ''}
                 onChange={(e) => setForm({ ...form, size_spec: e.target.value })}
+              />
+            </div>
+            <div className="col-md-4">
+              <label className="form-label">Type</label>
+              <input
+                className="form-control"
+                placeholder="e.g. Sofa Set, Bedframe"
+                value={form.item_type || ''}
+                onChange={(e) => setForm({ ...form, item_type: e.target.value })}
               />
             </div>
             <div className="col-md-6">

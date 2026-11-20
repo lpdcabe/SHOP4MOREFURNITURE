@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import Layout from '../components/Layout.jsx';
-import { api, formatPeso } from '../services/api.js';
+import { api, formatPeso, getNextCode } from '../services/api.js';
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -9,7 +9,10 @@ export default function ReceivingPage() {
   const [pos, setPos] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [search, setSearch] = useState('');
+  const [conditionFilter, setConditionFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState('All');
   const [showModal, setShowModal] = useState(false);
+  const [editing, setEditing] = useState(null);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [form, setForm] = useState({
     receiving_no: 'GR-0001',
@@ -43,10 +46,15 @@ export default function ReceivingPage() {
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    return records.filter((r) =>
-      `${r.receiving_no} ${r.po_no} ${r.supplier_name} ${r.condition}`.toLowerCase().includes(q)
-    );
-  }, [records, search]);
+    return records.filter((r) => {
+      const matchesSearch = `${r.receiving_no} ${r.po_no} ${r.supplier_name} ${r.condition}`
+        .toLowerCase()
+        .includes(q);
+      const matchesCondition = conditionFilter === 'All' || r.condition === conditionFilter;
+      const matchesStatus = statusFilter === 'All' || r.status === statusFilter;
+      return matchesSearch && matchesCondition && matchesStatus;
+    });
+  }, [records, search, conditionFilter, statusFilter]);
 
   const approvedPos = useMemo(
     () => pos.filter((po) => po.status === 'Approved'),
@@ -58,18 +66,32 @@ export default function ReceivingPage() {
     [approvedPos, form.po_no]
   );
 
-  const openModal = () => {
-    const defaultPo = approvedPos[0];
-    setForm({
-      receiving_no: `GR-${String(records.length + 1).padStart(4, '0')}`,
-      date_received: today(),
-      po_no: defaultPo?.po_no || '',
-      supplier_name: defaultPo?.supplier_name || '',
-      received_by: '',
-      condition: 'Good',
-      remarks: '',
-      status: 'Received'
-    });
+  const openModal = (item = null) => {
+    setEditing(item);
+    if (item) {
+      setForm({
+        receiving_no: item.receiving_no || '',
+        date_received: item.date_received || today(),
+        po_no: item.po_no || '',
+        supplier_name: item.supplier_name || '',
+        received_by: item.received_by || '',
+        condition: item.condition || 'Good',
+        remarks: item.remarks || '',
+        status: item.status || 'Received'
+      });
+    } else {
+      const defaultPo = approvedPos[0];
+      setForm({
+        receiving_no: getNextCode(records, 'receiving_no', 'GR-', 4),
+        date_received: today(),
+        po_no: defaultPo?.po_no || '',
+        supplier_name: defaultPo?.supplier_name || '',
+        received_by: '',
+        condition: 'Good',
+        remarks: '',
+        status: 'Received'
+      });
+    }
     setShowModal(true);
   };
 
@@ -86,8 +108,13 @@ export default function ReceivingPage() {
     e.preventDefault();
     try {
       const status = form.condition === 'Good' ? 'Received' : 'Inspection';
-      await api.createGoodsReceiving({ ...form, status });
-      setMessage({ type: 'success', text: 'Goods receiving record saved.' });
+      if (editing) {
+        await api.updateGoodsReceiving(editing.id, { ...form, status });
+        setMessage({ type: 'success', text: 'Goods receiving record updated.' });
+      } else {
+        await api.createGoodsReceiving({ ...form, status });
+        setMessage({ type: 'success', text: 'Goods receiving record saved.' });
+      }
       setShowModal(false);
       await load();
     } catch (err) {
@@ -95,7 +122,31 @@ export default function ReceivingPage() {
     }
   };
 
+  const handleDelete = async (id) => {
+    if (!window.confirm('Delete this receiving record?')) return;
+    await api.deleteGoodsReceiving(id);
+    await load();
+  };
+
   const previewStatus = form.condition === 'Good' ? 'Received' : 'Inspection';
+
+  const pageFilters = useMemo(
+    () => [
+      {
+        label: 'Condition',
+        value: conditionFilter,
+        onChange: setConditionFilter,
+        options: ['All', 'Good', 'Damaged', 'Incomplete']
+      },
+      {
+        label: 'Status',
+        value: statusFilter,
+        onChange: setStatusFilter,
+        options: ['All', 'Received', 'Inspection']
+      }
+    ],
+    [conditionFilter, statusFilter]
+  );
 
   return (
     <Layout
@@ -103,13 +154,14 @@ export default function ReceivingPage() {
       searchValue={search}
       onSearchChange={setSearch}
       searchPlaceholder="Search Receiving No."
+      filters={pageFilters}
     >
       {message.text && <div className={`alert alert-${message.type}`}>{message.text}</div>}
 
       <div className="card mt-2 p-4">
         <div className="d-flex justify-content-between align-items-center mb-3">
           <h4 className="mb-0">Receiving History</h4>
-          <button className="btn btn-maroon" onClick={openModal}>
+          <button className="btn btn-maroon" onClick={() => openModal()}>
             <i className="fas fa-box-open me-2" />
             Receive Goods
           </button>
@@ -125,6 +177,7 @@ export default function ReceivingPage() {
                 <th>Date</th>
                 <th>Condition</th>
                 <th>Status</th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody>
@@ -144,11 +197,27 @@ export default function ReceivingPage() {
                       {r.status}
                     </span>
                   </td>
+                  <td>
+                    <button
+                      className="btn btn-primary btn-sm me-2"
+                      title="Edit"
+                      onClick={() => openModal(r)}
+                    >
+                      <i className="fas fa-edit" />
+                    </button>
+                    <button
+                      className="btn btn-danger btn-sm"
+                      title="Delete"
+                      onClick={() => handleDelete(r.id)}
+                    >
+                      <i className="fas fa-trash" />
+                    </button>
+                  </td>
                 </tr>
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan="6" className="text-center text-muted py-4">
+                  <td colSpan="7" className="text-center text-muted py-4">
                     No receiving records found.
                   </td>
                 </tr>
@@ -164,22 +233,13 @@ export default function ReceivingPage() {
             <div className="d-flex justify-content-between align-items-center mb-3">
               <h5 className="mb-0">
                 <i className="fas fa-box-open me-2" />
-                Receive Goods
+                {editing ? `Edit Receiving (${editing.receiving_no})` : 'Receive Goods'}
               </h5>
               <button type="button" className="btn-close" onClick={() => setShowModal(false)} />
             </div>
 
             <form onSubmit={handleSubmit}>
               <div className="row g-3">
-                <div className="col-md-6">
-                  <label className="form-label">Receiving No.</label>
-                  <input
-                    className="form-control"
-                    required
-                    value={form.receiving_no}
-                    onChange={(e) => setForm({ ...form, receiving_no: e.target.value })}
-                  />
-                </div>
                 <div className="col-md-6">
                   <label className="form-label">Date Received</label>
                   <input
@@ -188,6 +248,15 @@ export default function ReceivingPage() {
                     required
                     value={form.date_received}
                     onChange={(e) => setForm({ ...form, date_received: e.target.value })}
+                  />
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label">Received By</label>
+                  <input
+                    className="form-control"
+                    placeholder="Employee Name"
+                    value={form.received_by}
+                    onChange={(e) => setForm({ ...form, received_by: e.target.value })}
                   />
                 </div>
 
@@ -275,16 +344,7 @@ export default function ReceivingPage() {
                   </div>
                 )}
 
-                <div className="col-md-6">
-                  <label className="form-label">Received By</label>
-                  <input
-                    className="form-control"
-                    placeholder="Employee Name"
-                    value={form.received_by}
-                    onChange={(e) => setForm({ ...form, received_by: e.target.value })}
-                  />
-                </div>
-                <div className="col-md-6">
+                <div className="col-12">
                   <div className="d-flex justify-content-between align-items-center">
                     <label className="form-label">Condition</label>
                     <span

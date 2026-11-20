@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import Layout from '../components/Layout.jsx';
-import { api, formatPeso } from '../services/api.js';
+import { api, formatPeso, getNextCode } from '../services/api.js';
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -8,6 +8,8 @@ export default function PurchaseOrdersPage() {
   const [orders, setOrders] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('All');
+  const [supplierFilter, setSupplierFilter] = useState('All');
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({
@@ -38,15 +40,20 @@ export default function PurchaseOrdersPage() {
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    return orders.filter((o) =>
-      `${o.po_no} ${o.supplier_name} ${o.status}`.toLowerCase().includes(q)
-    );
-  }, [orders, search]);
+    return orders.filter((o) => {
+      const matchesSearch = `${o.po_no} ${o.supplier_name} ${o.status}`
+        .toLowerCase()
+        .includes(q);
+      const matchesStatus = statusFilter === 'All' || o.status === statusFilter;
+      const matchesSupplier = supplierFilter === 'All' || o.supplier_name === supplierFilter;
+      return matchesSearch && matchesStatus && matchesSupplier;
+    });
+  }, [orders, search, statusFilter, supplierFilter]);
 
   const openCreate = () => {
     setEditing(null);
     setForm({
-      po_no: `PO-${String(orders.length + 1).padStart(4, '0')}`,
+      po_no: getNextCode(orders, 'po_no', 'PO-', 4),
       supplier_name: suppliers[0]?.company_name || 'ABC Furniture',
       order_date: today(),
       expected_delivery: today(),
@@ -86,6 +93,30 @@ export default function PurchaseOrdersPage() {
     await load();
   };
 
+  const handleDelete = async (id) => {
+    if (!window.confirm('Delete this purchase order?')) return;
+    await api.deletePurchaseOrder(id);
+    await load();
+  };
+
+
+  const pageFilters = useMemo(
+    () => [
+      {
+        label: 'Supplier',
+        value: supplierFilter,
+        onChange: setSupplierFilter,
+        options: ['All', ...suppliers.map((s) => s.company_name)]
+      },
+      {
+        label: 'Status',
+        value: statusFilter,
+        onChange: setStatusFilter,
+        options: ['All', 'Approved', 'Pending', 'Cancelled']
+      }
+    ],
+    [supplierFilter, statusFilter, suppliers]
+  );
 
   return (
     <Layout
@@ -93,6 +124,7 @@ export default function PurchaseOrdersPage() {
       searchValue={search}
       onSearchChange={setSearch}
       searchPlaceholder="Search Purchase Order"
+      filters={pageFilters}
     >
       {error && <div className="alert alert-warning">{error}</div>}
 
@@ -145,11 +177,18 @@ export default function PurchaseOrdersPage() {
                         <i className="fas fa-edit" />
                       </button>
                       <button
-                        className="btn btn-success btn-sm"
+                        className="btn btn-success btn-sm me-2"
                         title="Print"
                         onClick={() => window.print()}
                       >
                         <i className="fas fa-print" />
+                      </button>
+                      <button
+                        className="btn btn-danger btn-sm"
+                        title="Delete Purchase Order"
+                        onClick={() => handleDelete(po.id)}
+                      >
+                        <i className="fas fa-trash" />
                       </button>
                     </td>
                   </tr>
@@ -169,16 +208,13 @@ export default function PurchaseOrdersPage() {
             </div>
             <form onSubmit={handleSave}>
               <div className="row g-3">
-                <div className="col-md-6">
-                  <label className="form-label">PO No.</label>
-                  <input
-                    className="form-control"
-                    required
-                    value={form.po_no}
-                    onChange={(e) => setForm({ ...form, po_no: e.target.value })}
-                  />
-                </div>
-                <div className="col-md-6">
+                {editing && (
+                  <div className="col-md-6">
+                    <label className="form-label">PO No.</label>
+                    <input className="form-control bg-light" value={form.po_no} readOnly disabled />
+                  </div>
+                )}
+                <div className={editing ? 'col-md-6' : 'col-12'}>
                   <label className="form-label">Supplier</label>
                   <select
                     className="form-control"

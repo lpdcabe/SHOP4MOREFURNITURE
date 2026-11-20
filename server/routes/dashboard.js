@@ -50,12 +50,21 @@ router.get('/dashboard', async (_req, res) => {
     if (cumulative <= 70) classification = 'A';
     else if (cumulative <= 90) classification = 'B';
 
+    const maxDaily = Number(p.max_daily_demand || 0);
+    const maxLead = Number(p.max_lead_time || 0);
+    const avgDaily = Number(p.avg_daily_demand || 0);
+    const avgLead = Number(p.avg_lead_time || 0);
+    const safety_stock = Math.max(0, Math.round(maxDaily * maxLead - avgDaily * avgLead));
+    const computed_reorder_point = Math.round(avgDaily * avgLead + safety_stock);
+
     return {
       ...p,
       no: idx + 1,
       contribution_pct: Number(pct.toFixed(1)),
       cumulative_pct: Number(cumulative.toFixed(1)),
-      classification
+      classification,
+      safety_stock,
+      computed_reorder_point
     };
   });
 

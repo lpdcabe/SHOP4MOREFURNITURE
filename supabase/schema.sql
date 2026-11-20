@@ -38,11 +38,16 @@ CREATE TABLE IF NOT EXISTS products (
     name TEXT NOT NULL,
     category TEXT NOT NULL,
     size_spec TEXT DEFAULT '',
+    item_type TEXT DEFAULT '',
     supplier_name TEXT NOT NULL,
     price NUMERIC(12, 2) NOT NULL DEFAULT 0,
     stock INTEGER NOT NULL DEFAULT 0,
     reorder_level INTEGER NOT NULL DEFAULT 10,
     annual_sales INTEGER NOT NULL DEFAULT 0,
+    max_daily_demand NUMERIC(10, 2) NOT NULL DEFAULT 0,
+    max_lead_time NUMERIC(10, 2) NOT NULL DEFAULT 0,
+    avg_daily_demand NUMERIC(10, 2) NOT NULL DEFAULT 0,
+    avg_lead_time NUMERIC(10, 2) NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

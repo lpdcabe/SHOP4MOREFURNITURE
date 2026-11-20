@@ -10,7 +10,10 @@ export default function InventoryPage() {
   const [stockInList, setStockInList] = useState([]);
   const [stockOutList, setStockOutList] = useState([]);
   const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState('All');
   const [modalMode, setModalMode] = useState(null); // 'in' | 'out' | null
+  const [editingTx, setEditingTx] = useState(null);
   const [error, setError] = useState('');
 
   const loadAll = async () => {
@@ -39,12 +42,23 @@ export default function InventoryPage() {
 
   const products = dash?.products || [];
 
+  const categories = useMemo(() => {
+    const set = new Set(products.map((p) => p.category).filter(Boolean));
+    return ['All', ...Array.from(set)];
+  }, [products]);
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    return products.filter((p) =>
-      `${p.code} ${p.name} ${p.category} ${p.supplier_name}`.toLowerCase().includes(q)
-    );
-  }, [products, search]);
+    return products.filter((p) => {
+      const matchesSearch = `${p.code} ${p.name} ${p.category} ${p.supplier_name}`
+        .toLowerCase()
+        .includes(q);
+      const matchesCategory = categoryFilter === 'All' || p.category === categoryFilter;
+      const badgeLabel = getStockBadge(p.stock, p.reorder_level).label;
+      const matchesStatus = statusFilter === 'All' || badgeLabel === statusFilter;
+      return matchesSearch && matchesCategory && matchesStatus;
+    });
+  }, [products, search, categoryFilter, statusFilter]);
 
   const exportCsv = () => {
     const header = ['Code', 'Product', 'Category', 'Supplier', 'Stock', 'Reorder Level', 'Status'];
@@ -72,23 +86,52 @@ export default function InventoryPage() {
       ? `SI-${String(stockInList.length + 1).padStart(4, '0')}`
       : `SO-${String(stockOutList.length + 1).padStart(4, '0')}`;
 
+  const handleDeleteStockIn = async (id) => {
+    if (!window.confirm('Delete this Stock In transaction?')) return;
+    await api.deleteStockIn(id);
+    await loadAll();
+  };
+
+  const handleDeleteStockOut = async (id) => {
+    if (!window.confirm('Delete this Stock Out transaction?')) return;
+    await api.deleteStockOut(id);
+    await loadAll();
+  };
+
+  const pageFilters = useMemo(
+    () => [
+      { label: 'Category', value: categoryFilter, onChange: setCategoryFilter, options: categories },
+      {
+        label: 'Status',
+        value: statusFilter,
+        onChange: setStatusFilter,
+        options: ['All', 'In Stock', 'Low Stock', 'Out of Stock']
+      }
+    ],
+    [categoryFilter, statusFilter, categories]
+  );
+
   return (
     <Layout
       title="Current Inventory"
       searchValue={search}
       onSearchChange={setSearch}
       searchPlaceholder="Search Product"
+      filters={pageFilters}
     >
       {error && <div className="alert alert-warning">{error}</div>}
 
       <div className="card mt-2 p-4">
         <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
           <h4 className="mb-0">Inventory List</h4>
-          <div className="d-flex flex-wrap gap-2">
+          <div className="d-flex flex-wrap align-items-center gap-2">
             <button
               type="button"
               className="btn btn-outline-secondary"
-              onClick={() => setModalMode('in')}
+              onClick={() => {
+                setEditingTx(null);
+                setModalMode('in');
+              }}
             >
               <i className="fas fa-arrow-down me-2" />
               Stock In
@@ -96,7 +139,10 @@ export default function InventoryPage() {
             <button
               type="button"
               className="btn btn-outline-secondary"
-              onClick={() => setModalMode('out')}
+              onClick={() => {
+                setEditingTx(null);
+                setModalMode('out');
+              }}
             >
               <i className="fas fa-arrow-up me-2" />
               Stock Out
@@ -156,6 +202,7 @@ export default function InventoryPage() {
                     <th>Supplier</th>
                     <th>Product</th>
                     <th>Qty</th>
+                    <th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -166,6 +213,25 @@ export default function InventoryPage() {
                       <td>{t.supplier_name}</td>
                       <td>{t.product_name}</td>
                       <td>{t.quantity}</td>
+                      <td>
+                        <button
+                          className="btn btn-primary btn-sm me-1"
+                          title="Edit"
+                          onClick={() => {
+                            setEditingTx(t);
+                            setModalMode('in');
+                          }}
+                        >
+                          <i className="fas fa-edit" />
+                        </button>
+                        <button
+                          className="btn btn-danger btn-sm"
+                          title="Delete"
+                          onClick={() => handleDeleteStockIn(t.id)}
+                        >
+                          <i className="fas fa-trash" />
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -186,6 +252,7 @@ export default function InventoryPage() {
                     <th>Customer</th>
                     <th>Product</th>
                     <th>Qty</th>
+                    <th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -196,6 +263,25 @@ export default function InventoryPage() {
                       <td>{t.customer_name}</td>
                       <td>{t.product_name}</td>
                       <td>{t.quantity}</td>
+                      <td>
+                        <button
+                          className="btn btn-primary btn-sm me-1"
+                          title="Edit"
+                          onClick={() => {
+                            setEditingTx(t);
+                            setModalMode('out');
+                          }}
+                        >
+                          <i className="fas fa-edit" />
+                        </button>
+                        <button
+                          className="btn btn-danger btn-sm"
+                          title="Delete"
+                          onClick={() => handleDeleteStockOut(t.id)}
+                        >
+                          <i className="fas fa-trash" />
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -208,11 +294,15 @@ export default function InventoryPage() {
       <StockTransactionModal
         show={Boolean(modalMode)}
         mode={modalMode || 'in'}
+        initialData={editingTx}
         products={products}
         suppliers={suppliers}
         customers={customers}
         nextNo={nextNo}
-        onClose={() => setModalMode(null)}
+        onClose={() => {
+          setModalMode(null);
+          setEditingTx(null);
+        }}
         onSaved={loadAll}
       />
     </Layout>

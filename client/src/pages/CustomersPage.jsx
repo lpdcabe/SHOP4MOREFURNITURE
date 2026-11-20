@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import Layout from '../components/Layout.jsx';
-import { api } from '../services/api.js';
+import { api, getNextCode } from '../services/api.js';
 
 const EMPTY = {
   code: '',
@@ -15,6 +15,7 @@ const EMPTY = {
 export default function CustomersPage() {
   const [customers, setCustomers] = useState([]);
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('All');
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY);
@@ -35,14 +36,18 @@ export default function CustomersPage() {
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    return customers.filter((c) =>
-      `${c.code} ${c.name} ${c.email} ${c.address}`.toLowerCase().includes(q)
-    );
-  }, [customers, search]);
+    return customers.filter((c) => {
+      const matchesSearch = `${c.code} ${c.name} ${c.email} ${c.address}`
+        .toLowerCase()
+        .includes(q);
+      const matchesStatus = statusFilter === 'All' || c.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+  }, [customers, search, statusFilter]);
 
   const openModal = (item = null) => {
     setEditing(item);
-    setForm(item ? { ...EMPTY, ...item } : { ...EMPTY, code: `CUS-${String(customers.length + 1).padStart(3, '0')}` });
+    setForm(item ? { ...EMPTY, ...item } : { ...EMPTY, code: getNextCode(customers, 'code', 'CUS-', 3) });
     setShowModal(true);
   };
 
@@ -64,12 +69,25 @@ export default function CustomersPage() {
     await load();
   };
 
+  const pageFilters = useMemo(
+    () => [
+      {
+        label: 'Status',
+        value: statusFilter,
+        onChange: setStatusFilter,
+        options: ['All', 'Active', 'Occasional', 'Inactive']
+      }
+    ],
+    [statusFilter]
+  );
+
   return (
     <Layout
       title="Customer Management"
       searchValue={search}
       onSearchChange={setSearch}
       searchPlaceholder="Search Customer"
+      filters={pageFilters}
     >
       {error && <div className="alert alert-warning">{error}</div>}
 
@@ -144,16 +162,13 @@ export default function CustomersPage() {
             </div>
             <form onSubmit={handleSave}>
               <div className="row g-3">
-                <div className="col-md-4">
-                  <label className="form-label">Customer ID</label>
-                  <input
-                    className="form-control"
-                    required
-                    value={form.code}
-                    onChange={(e) => setForm({ ...form, code: e.target.value })}
-                  />
-                </div>
-                <div className="col-md-8">
+                {editing && (
+                  <div className="col-md-4">
+                    <label className="form-label">Customer ID</label>
+                    <input className="form-control bg-light" value={form.code} readOnly disabled />
+                  </div>
+                )}
+                <div className={editing ? 'col-md-8' : 'col-12'}>
                   <label className="form-label">Name</label>
                   <input
                     className="form-control"

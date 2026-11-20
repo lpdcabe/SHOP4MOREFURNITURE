@@ -6,6 +6,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 export default function StockTransactionModal({
   show,
   mode = 'in',
+  initialData = null,
   products = [],
   suppliers = [],
   customers = [],
@@ -29,22 +30,35 @@ export default function StockTransactionModal({
 
   useEffect(() => {
     if (!show) return;
-    const defaultParty = isIn
-      ? suppliers[0]?.company_name || ''
-      : customers[0]?.name || '';
-    const defaultProd = products[0];
-    setForm({
-      transaction_no: nextNo || (isIn ? 'SI-0001' : 'SO-0001'),
-      transaction_date: today(),
-      party_name: defaultParty,
-      staff_name: '',
-      product_name: defaultProd?.name || '',
-      quantity: '',
-      unit_amount: isIn ? '' : defaultProd?.price || '',
-      remarks: ''
-    });
+    if (initialData) {
+      setForm({
+        transaction_no: initialData.transaction_no || '',
+        transaction_date: initialData.transaction_date || today(),
+        party_name: isIn ? initialData.supplier_name || '' : initialData.customer_name || '',
+        staff_name: isIn ? initialData.received_by || '' : initialData.released_by || '',
+        product_name: initialData.product_name || '',
+        quantity: initialData.quantity ?? '',
+        unit_amount: isIn ? initialData.unit_cost ?? '' : initialData.unit_price ?? '',
+        remarks: initialData.remarks || ''
+      });
+    } else {
+      const defaultParty = isIn
+        ? suppliers[0]?.company_name || ''
+        : customers[0]?.name || '';
+      const defaultProd = products[0];
+      setForm({
+        transaction_no: nextNo || (isIn ? 'SI-0001' : 'SO-0001'),
+        transaction_date: today(),
+        party_name: defaultParty,
+        staff_name: '',
+        product_name: defaultProd?.name || '',
+        quantity: '',
+        unit_amount: isIn ? '' : defaultProd?.price || '',
+        remarks: ''
+      });
+    }
     setError('');
-  }, [show, mode, nextNo, products, suppliers, customers, isIn]);
+  }, [show, mode, initialData, nextNo, products, suppliers, customers, isIn]);
 
   if (!show) return null;
 
@@ -64,8 +78,7 @@ export default function StockTransactionModal({
     try {
       const matched = products.find((p) => p.name === form.product_name);
       if (isIn) {
-        await api.createStockIn({
-          transaction_no: form.transaction_no,
+        const payload = {
           transaction_date: form.transaction_date,
           supplier_name: form.party_name,
           received_by: form.staff_name,
@@ -74,11 +87,12 @@ export default function StockTransactionModal({
           quantity: Number(form.quantity),
           unit_cost: Number(form.unit_amount) || 0,
           remarks: form.remarks,
-          status: 'Completed'
-        });
+          status: initialData?.status || 'Completed'
+        };
+        if (initialData) await api.updateStockIn(initialData.id, payload);
+        else await api.createStockIn(payload);
       } else {
-        await api.createStockOut({
-          transaction_no: form.transaction_no,
+        const payload = {
           transaction_date: form.transaction_date,
           customer_name: form.party_name,
           released_by: form.staff_name,
@@ -87,8 +101,10 @@ export default function StockTransactionModal({
           quantity: Number(form.quantity),
           unit_price: Number(form.unit_amount) || 0,
           remarks: form.remarks,
-          status: 'Completed'
-        });
+          status: initialData?.status || 'Completed'
+        };
+        if (initialData) await api.updateStockOut(initialData.id, payload);
+        else await api.createStockOut(payload);
       }
       await onSaved?.();
       onClose();
@@ -105,7 +121,13 @@ export default function StockTransactionModal({
         <div className="d-flex justify-content-between align-items-center mb-3">
           <h5 className="mb-0">
             <i className={`fas ${isIn ? 'fa-arrow-down' : 'fa-arrow-up'} me-2`} />
-            {isIn ? 'New Stock Entry (Stock In)' : 'Release Inventory (Stock Out)'}
+            {initialData
+              ? isIn
+                ? `Edit Stock In (${initialData.transaction_no})`
+                : `Edit Stock Out (${initialData.transaction_no})`
+              : isIn
+              ? 'New Stock Entry (Stock In)'
+              : 'Release Inventory (Stock Out)'}
           </h5>
           <button type="button" className="btn-close" onClick={onClose} />
         </div>
@@ -115,15 +137,6 @@ export default function StockTransactionModal({
         <form onSubmit={handleSubmit}>
           <div className="row g-3">
             <div className="col-md-6">
-              <label className="form-label">Transaction No.</label>
-              <input
-                className="form-control"
-                required
-                value={form.transaction_no}
-                onChange={(e) => setForm({ ...form, transaction_no: e.target.value })}
-              />
-            </div>
-            <div className="col-md-6">
               <label className="form-label">Date</label>
               <input
                 type="date"
@@ -131,6 +144,15 @@ export default function StockTransactionModal({
                 required
                 value={form.transaction_date}
                 onChange={(e) => setForm({ ...form, transaction_date: e.target.value })}
+              />
+            </div>
+            <div className="col-md-6">
+              <label className="form-label">{isIn ? 'Received By' : 'Released By'}</label>
+              <input
+                className="form-control"
+                placeholder="Employee Name"
+                value={form.staff_name}
+                onChange={(e) => setForm({ ...form, staff_name: e.target.value })}
               />
             </div>
             <div className="col-md-6">
@@ -151,15 +173,6 @@ export default function StockTransactionModal({
               </select>
             </div>
             <div className="col-md-6">
-              <label className="form-label">{isIn ? 'Received By' : 'Released By'}</label>
-              <input
-                className="form-control"
-                placeholder="Employee Name"
-                value={form.staff_name}
-                onChange={(e) => setForm({ ...form, staff_name: e.target.value })}
-              />
-            </div>
-            <div className="col-md-6">
               <label className="form-label">Product</label>
               <select
                 className="form-control"
@@ -173,7 +186,7 @@ export default function StockTransactionModal({
                 ))}
               </select>
             </div>
-            <div className="col-md-3">
+            <div className="col-md-6">
               <label className="form-label">Quantity</label>
               <input
                 type="number"
@@ -184,7 +197,7 @@ export default function StockTransactionModal({
                 onChange={(e) => setForm({ ...form, quantity: e.target.value })}
               />
             </div>
-            <div className="col-md-3">
+            <div className="col-md-6">
               <label className="form-label">{isIn ? 'Unit Cost (₱)' : 'Unit Price (₱)'}</label>
               <input
                 type="number"

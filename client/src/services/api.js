@@ -41,8 +41,12 @@ export const api = {
   // Stock In / Out
   getStockIn: () => request('/stock-in'),
   createStockIn: (body) => request('/stock-in', { method: 'POST', body: JSON.stringify(body) }),
+  updateStockIn: (id, body) => request(`/stock-in/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteStockIn: (id) => request(`/stock-in/${id}`, { method: 'DELETE' }),
   getStockOut: () => request('/stock-out'),
   createStockOut: (body) => request('/stock-out', { method: 'POST', body: JSON.stringify(body) }),
+  updateStockOut: (id, body) => request(`/stock-out/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteStockOut: (id) => request(`/stock-out/${id}`, { method: 'DELETE' }),
 
   // Purchase Orders
   getPurchaseOrders: () => request('/purchase-orders'),
@@ -53,11 +57,14 @@ export const api = {
   // Goods Receiving
   getGoodsReceiving: () => request('/goods-receiving'),
   createGoodsReceiving: (body) => request('/goods-receiving', { method: 'POST', body: JSON.stringify(body) }),
+  updateGoodsReceiving: (id, body) => request(`/goods-receiving/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteGoodsReceiving: (id) => request(`/goods-receiving/${id}`, { method: 'DELETE' }),
 
   // Delivery Receipts
   getDeliveryReceipts: () => request('/delivery-receipts'),
   createDeliveryReceipt: (body) => request('/delivery-receipts', { method: 'POST', body: JSON.stringify(body) }),
   updateDeliveryReceipt: (id, body) => request(`/delivery-receipts/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteDeliveryReceipt: (id) => request(`/delivery-receipts/${id}`, { method: 'DELETE' }),
 
   // Settings
   getSettings: () => request('/settings'),
@@ -72,4 +79,17 @@ export function getStockBadge(stock, reorderLevel = 10) {
   if (stock <= 0) return { label: 'Out of Stock', cls: 'bg-danger' };
   if (stock <= reorderLevel) return { label: 'Low Stock', cls: 'bg-warning text-dark' };
   return { label: 'In Stock', cls: 'bg-success' };
+}
+
+export function getNextCode(items = [], field = 'code', prefix = 'ID-', pad = 3) {
+  let maxNum = 0;
+  for (const item of items) {
+    const match = String(item[field] || '').match(/(\d+)$/);
+    if (match) {
+      const n = Number(match[1]);
+      if (n > maxNum) maxNum = n;
+    }
+  }
+  const next = Math.max(maxNum + 1, items.length + 1);
+  return `${prefix}${String(next).padStart(pad, '0')}`;
 }

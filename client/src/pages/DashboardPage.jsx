@@ -2,21 +2,15 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout.jsx';
 import ChartCanvas from '../components/ChartCanvas.jsx';
-import ProductModal from '../components/ProductModal.jsx';
 import StockTransactionModal from '../components/StockTransactionModal.jsx';
-import { api, formatPeso, getStockBadge } from '../services/api.js';
+import { api } from '../services/api.js';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [suppliers, setSuppliers] = useState([]);
   const [customers, setCustomers] = useState([]);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
-  const [categoryFilter, setCategoryFilter] = useState('All');
-  const [showModal, setShowModal] = useState(false);
   const [stockModalMode, setStockModalMode] = useState(null);
-  const [editingProduct, setEditingProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -51,24 +45,6 @@ export default function DashboardPage() {
     inStockCount: 0,
     supplierCount: 0
   };
-
-  const categories = useMemo(() => {
-    const set = new Set((data?.products || []).map((p) => p.category).filter(Boolean));
-    return ['All', ...Array.from(set)];
-  }, [data]);
-
-  const filteredProducts = useMemo(() => {
-    const q = search.toLowerCase();
-    return (data?.products || []).filter((p) => {
-      const matchesSearch = `${p.code} ${p.name} ${p.category} ${p.supplier_name}`
-        .toLowerCase()
-        .includes(q);
-      const matchesCategory = categoryFilter === 'All' || p.category === categoryFilter;
-      const badgeLabel = getStockBadge(p.stock, p.reorder_level).label;
-      const matchesStatus = statusFilter === 'All' || badgeLabel === statusFilter;
-      return matchesSearch && matchesCategory && matchesStatus;
-    });
-  }, [data, search, categoryFilter, statusFilter]);
 
   const barData = useMemo(() => {
     const movement = data?.monthlyMovement || [];
@@ -117,37 +93,15 @@ export default function DashboardPage() {
     [summary]
   );
 
-  const handleSaveProduct = async (payload) => {
-    if (editingProduct) {
-      await api.updateProduct(editingProduct.id, payload);
-    } else {
-      await api.createProduct(payload);
-    }
-    await loadData();
-  };
-
-  const handleQuickAdjust = async (product, delta) => {
-    const nextStock = Math.max(0, (product.stock || 0) + delta);
-    await api.updateProduct(product.id, { stock: nextStock });
-    await loadData();
-  };
-
   return (
-    <Layout
-      title="Dashboard"
-      searchValue={search}
-      onSearchChange={setSearch}
-      searchPlaceholder="Search Product..."
-    >
+    <Layout title="Dashboard">
       {error && <div className="alert alert-warning">{error}</div>}
 
       <div className="row g-4 mt-1">
         <div className="col-lg-3 col-md-6">
           <div
-            className={`card dashboard-card interactive-card ${
-              statusFilter === 'All' ? 'active-card' : ''
-            }`}
-            onClick={() => setStatusFilter('All')}
+            className="card dashboard-card interactive-card"
+            onClick={() => navigate('/products')}
             role="button"
             tabIndex={0}
           >
@@ -170,18 +124,14 @@ export default function DashboardPage() {
         </div>
         <div className="col-lg-3 col-md-6">
           <div
-            className={`card dashboard-card interactive-card ${
-              statusFilter === 'Low Stock' ? 'active-card' : ''
-            }`}
-            onClick={() =>
-              setStatusFilter((prev) => (prev === 'Low Stock' ? 'All' : 'Low Stock'))
-            }
+            className="card dashboard-card interactive-card"
+            onClick={() => navigate('/inventory')}
             role="button"
             tabIndex={0}
           >
             <i className="fas fa-triangle-exclamation" />
             <h3>{summary.lowStockCount}</h3>
-            <p>Low Stock (Click to Filter)</p>
+            <p>Low Stock</p>
           </div>
         </div>
         <div className="col-lg-3 col-md-6">
@@ -222,144 +172,13 @@ export default function DashboardPage() {
         </div>
         <div className="col-lg-4">
           <div className="card p-4 h-100">
-            <div className="d-flex justify-content-between align-items-center mb-2">
-              <h5 className="mb-0">Inventory Status</h5>
-              {statusFilter !== 'All' && (
-                <button
-                  type="button"
-                  className="btn btn-sm btn-link text-decoration-none p-0"
-                  onClick={() => setStatusFilter('All')}
-                >
-                  Clear filter
-                </button>
-              )}
-            </div>
+            <h5 className="mb-2">Inventory Status</h5>
             <ChartCanvas
               type="doughnut"
               data={pieData}
               options={{ responsive: true, cutout: '65%' }}
             />
           </div>
-        </div>
-      </div>
-
-      <div className="card mt-4 p-4">
-        <div className="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
-          <h5 className="mb-0">Current Inventory</h5>
-
-          <div className="d-flex flex-wrap align-items-center gap-2">
-            <select
-              className="form-select form-select-sm"
-              style={{ width: 'auto' }}
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-            >
-              {categories.map((c) => (
-                <option key={c} value={c}>
-                  {c === 'All' ? 'All Categories' : c}
-                </option>
-              ))}
-            </select>
-
-            <div className="btn-group btn-group-sm" role="group">
-              {['All', 'In Stock', 'Low Stock', 'Out of Stock'].map((st) => (
-                <button
-                  key={st}
-                  type="button"
-                  className={`btn ${
-                    statusFilter === st ? 'btn-maroon' : 'btn-outline-secondary'
-                  }`}
-                  onClick={() => setStatusFilter(st)}
-                >
-                  {st}
-                </button>
-              ))}
-            </div>
-
-            <button
-              className="btn btn-maroon btn-sm"
-              onClick={() => {
-                setEditingProduct(null);
-                setShowModal(true);
-              }}
-            >
-              <i className="fas fa-plus me-1" />
-              Add Product
-            </button>
-          </div>
-        </div>
-
-        <div className="table-responsive">
-          <table className="table table-hover mt-2">
-            <thead>
-              <tr>
-                <th>Code</th>
-                <th>Product</th>
-                <th>Category</th>
-                <th>Stock</th>
-                <th>Price</th>
-                <th>Status</th>
-                <th>Quick Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredProducts.map((p) => {
-                const badge = getStockBadge(p.stock, p.reorder_level);
-                return (
-                  <tr key={p.id}>
-                    <td>{p.code}</td>
-                    <td>{p.name}</td>
-                    <td>{p.category}</td>
-                    <td>
-                      <div className="d-flex align-items-center gap-2">
-                        <button
-                          type="button"
-                          className="btn btn-outline-secondary btn-sm py-0 px-2"
-                          title="Decrease stock by 1"
-                          onClick={() => handleQuickAdjust(p, -1)}
-                        >
-                          -
-                        </button>
-                        <span className="fw-semibold">{p.stock}</span>
-                        <button
-                          type="button"
-                          className="btn btn-outline-secondary btn-sm py-0 px-2"
-                          title="Increase stock by 1"
-                          onClick={() => handleQuickAdjust(p, 1)}
-                        >
-                          +
-                        </button>
-                      </div>
-                    </td>
-                    <td>{formatPeso(p.price)}</td>
-                    <td>
-                      <span className={`badge ${badge.cls}`}>{badge.label}</span>
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-primary"
-                        title="Edit Product"
-                        onClick={() => {
-                          setEditingProduct(p);
-                          setShowModal(true);
-                        }}
-                      >
-                        <i className="fas fa-edit" />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-              {filteredProducts.length === 0 && (
-                <tr>
-                  <td colSpan="7" className="text-center text-muted py-4">
-                    No products match the current filters.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
         </div>
       </div>
 
@@ -415,7 +234,9 @@ export default function DashboardPage() {
                   <td>{act.party}</td>
                   <td>{act.quantity}</td>
                   <td>{act.date}</td>
-                  <td>{act.status}</td>
+                  <td>
+                    <span className="badge bg-secondary">{act.status}</span>
+                  </td>
                 </tr>
               ))}
               {(data?.recentActivity || []).length === 0 && (
@@ -429,14 +250,6 @@ export default function DashboardPage() {
           </table>
         </div>
       </div>
-
-      <ProductModal
-        show={showModal}
-        initialData={editingProduct}
-        suppliers={suppliers}
-        onClose={() => setShowModal(false)}
-        onSave={handleSaveProduct}
-      />
 
       <StockTransactionModal
         show={Boolean(stockModalMode)}
