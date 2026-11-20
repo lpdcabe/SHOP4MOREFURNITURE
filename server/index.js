@@ -90,6 +90,10 @@ app.use('/api/delivery-receipts', createCrudRouter('delivery_receipts', { orderB
 app.use('/api', transactionsRouter);
 app.use('/api', dashboardRouter);
 
-app.listen(PORT, () => {
-  console.log(`Shop 4 More API server running on http://localhost:${PORT}`);
-});
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`Shop 4 More API server running on http://localhost:${PORT}`);
+  });
+}
+
+export default app;

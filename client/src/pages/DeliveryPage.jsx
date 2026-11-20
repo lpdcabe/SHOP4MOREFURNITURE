@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import Layout from '../components/Layout.jsx';
+import Pagination, { usePagination } from '../components/Pagination.jsx';
 import { api, getNextCode } from '../services/api.js';
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -46,6 +47,8 @@ export default function DeliveryPage() {
       return matchesSearch && matchesStatus;
     });
   }, [receipts, search, statusFilter]);
+
+  const pg = usePagination(filtered, 10);
 
   const openModal = (item = null) => {
     setEditing(item);
@@ -151,7 +154,7 @@ export default function DeliveryPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((dr) => {
+              {pg.paginatedItems.map((dr) => {
                 const badgeCls =
                   dr.status === 'Delivered'
                     ? 'bg-success'
@@ -210,6 +213,7 @@ export default function DeliveryPage() {
             </tbody>
           </table>
         </div>
+        <Pagination {...pg} onPageChange={pg.setPage} />
       </div>
 
       {showModal && (

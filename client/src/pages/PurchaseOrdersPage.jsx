@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import Layout from '../components/Layout.jsx';
+import Pagination, { usePagination } from '../components/Pagination.jsx';
 import { api, formatPeso, getNextCode } from '../services/api.js';
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -49,6 +50,8 @@ export default function PurchaseOrdersPage() {
       return matchesSearch && matchesStatus && matchesSupplier;
     });
   }, [orders, search, statusFilter, supplierFilter]);
+
+  const pg = usePagination(filtered, 10);
 
   const openCreate = () => {
     setEditing(null);
@@ -151,7 +154,7 @@ export default function PurchaseOrdersPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((po) => {
+              {pg.paginatedItems.map((po) => {
                 const badgeCls =
                   po.status === 'Approved'
                     ? 'bg-success'
@@ -197,6 +200,7 @@ export default function PurchaseOrdersPage() {
             </tbody>
           </table>
         </div>
+        <Pagination {...pg} onPageChange={pg.setPage} />
       </div>
 
       {showModal && (

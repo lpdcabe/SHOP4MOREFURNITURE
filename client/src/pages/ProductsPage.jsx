@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Layout from '../components/Layout.jsx';
 import ProductModal from '../components/ProductModal.jsx';
+import Pagination, { usePagination } from '../components/Pagination.jsx';
 import { api, formatPeso, getStockBadge } from '../services/api.js';
 
 export default function ProductsPage() {
@@ -45,6 +46,8 @@ export default function ProductsPage() {
       return matchesSearch && matchesCategory && matchesStatus;
     });
   }, [products, search, categoryFilter, statusFilter]);
+
+  const pg = usePagination(filtered, 10);
 
   const handleSave = async (payload) => {
     if (editing) {
@@ -116,7 +119,7 @@ export default function ProductsPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((p) => {
+              {pg.paginatedItems.map((p) => {
                 const badge = getStockBadge(p.stock, p.reorder_level);
                 return (
                   <tr key={p.id}>
@@ -161,6 +164,7 @@ export default function ProductsPage() {
             </tbody>
           </table>
         </div>
+        <Pagination {...pg} onPageChange={pg.setPage} />
       </div>
 
       <ProductModal

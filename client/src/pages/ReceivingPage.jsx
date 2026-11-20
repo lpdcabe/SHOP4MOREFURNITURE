@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import Layout from '../components/Layout.jsx';
+import Pagination, { usePagination } from '../components/Pagination.jsx';
 import { api, formatPeso, getNextCode } from '../services/api.js';
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -55,6 +56,8 @@ export default function ReceivingPage() {
       return matchesSearch && matchesCondition && matchesStatus;
     });
   }, [records, search, conditionFilter, statusFilter]);
+
+  const pg = usePagination(filtered, 10);
 
   const approvedPos = useMemo(
     () => pos.filter((po) => po.status === 'Approved'),
@@ -181,7 +184,7 @@ export default function ReceivingPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((r) => (
+              {pg.paginatedItems.map((r) => (
                 <tr key={r.id}>
                   <td>{r.receiving_no}</td>
                   <td>{r.po_no}</td>
@@ -225,6 +228,7 @@ export default function ReceivingPage() {
             </tbody>
           </table>
         </div>
+        <Pagination {...pg} onPageChange={pg.setPage} />
       </div>
 
       {showModal && (

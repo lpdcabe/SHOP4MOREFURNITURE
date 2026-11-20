@@ -785,6 +785,52 @@ body {
   border-color: #7dd3fc;
 }
 
+/* Pagination */
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.page-btn {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  color: #374151;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.page-btn:hover:not(:disabled) {
+  border-color: #6B1020;
+  color: #6B1020;
+}
+
+.page-btn.active {
+  background: #6B1020;
+  border-color: #6B1020;
+  color: #ffffff;
+}
+
+.page-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.page-dots {
+  padding: 0 4px;
+  color: #9ca3af;
+  font-size: 13px;
+}
+
 /* Modal Backdrop */
 .modal-backdrop-custom {
   position: fixed;

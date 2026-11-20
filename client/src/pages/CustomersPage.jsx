@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import Layout from '../components/Layout.jsx';
+import Pagination, { usePagination } from '../components/Pagination.jsx';
 import { api, getNextCode } from '../services/api.js';
 
 const EMPTY = {
@@ -44,6 +45,8 @@ export default function CustomersPage() {
       return matchesSearch && matchesStatus;
     });
   }, [customers, search, statusFilter]);
+
+  const pg = usePagination(filtered, 10);
 
   const openModal = (item = null) => {
     setEditing(item);
@@ -115,7 +118,7 @@ export default function CustomersPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((c) => (
+              {pg.paginatedItems.map((c) => (
                 <tr key={c.id}>
                   <td>{c.code}</td>
                   <td>{c.name}</td>
@@ -151,6 +154,7 @@ export default function CustomersPage() {
             </tbody>
           </table>
         </div>
+        <Pagination {...pg} onPageChange={pg.setPage} />
       </div>
 
       {showModal && (

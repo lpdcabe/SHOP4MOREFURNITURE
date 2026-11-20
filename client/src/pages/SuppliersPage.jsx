@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import Layout from '../components/Layout.jsx';
+import Pagination, { usePagination } from '../components/Pagination.jsx';
 import { api, getNextCode } from '../services/api.js';
 
 const EMPTY = {
@@ -44,6 +45,8 @@ export default function SuppliersPage() {
       return matchesSearch && matchesStatus;
     });
   }, [suppliers, search, statusFilter]);
+
+  const pg = usePagination(filtered, 10);
 
   const openModal = (item = null) => {
     setEditing(item);
@@ -114,7 +117,7 @@ export default function SuppliersPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((s) => (
+              {pg.paginatedItems.map((s) => (
                 <tr key={s.id}>
                   <td>{s.code}</td>
                   <td>{s.company_name}</td>
@@ -150,6 +153,7 @@ export default function SuppliersPage() {
             </tbody>
           </table>
         </div>
+        <Pagination {...pg} onPageChange={pg.setPage} />
       </div>
 
       {showModal && (
