@@ -1,0 +1,14 @@
+{
+  "name": "shop4more-furniture-inventory",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Shop 4 More Furniture Inventory System (Express.js + React + Supabase)",
+  "scripts": {
+    "dev": "concurrently \"npm --prefix server run dev\" \"npm --prefix client run dev\"",
+    "build": "npm --prefix client run build",
+    "start": "npm --prefix server start"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
