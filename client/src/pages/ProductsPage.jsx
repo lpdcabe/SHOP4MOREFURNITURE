@@ -1,10 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
-import Layout from '../components/Layout.jsx';
+import Layout, { useFeedback } from '../components/Layout.jsx';
 import ProductModal from '../components/ProductModal.jsx';
 import Pagination, { usePagination } from '../components/Pagination.jsx';
+import TableActionMenu from '../components/TableActionMenu.jsx';
 import { api, formatPeso, getStockBadge } from '../services/api.js';
 
+const PRODUCT_ACTIONS = [
+  { key: 'edit', label: 'Edit', icon: 'fas fa-edit', variant: 'primary' },
+  { key: 'delete', label: 'Delete', icon: 'fas fa-trash', variant: 'danger' }
+];
+
 export default function ProductsPage() {
+  const { notify, confirmAction } = useFeedback();
   const [products, setProducts] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [search, setSearch] = useState('');
@@ -12,6 +19,7 @@ export default function ProductsPage() {
   const [statusFilter, setStatusFilter] = useState('All');
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [actionMode, setActionMode] = useState(null);
   const [error, setError] = useState('');
 
   const loadData = async () => {
@@ -52,15 +60,19 @@ export default function ProductsPage() {
   const handleSave = async (payload) => {
     if (editing) {
       await api.updateProduct(editing.id, payload);
+      notify('Product updated.');
     } else {
       await api.createProduct(payload);
+      notify('Product added.');
     }
     await loadData();
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Delete this product?')) return;
+    const ok = await confirmAction({ message: 'Are you sure you want to delete this product?' });
+    if (!ok) return;
     await api.deleteProduct(id);
+    notify('Product deleted.');
     await loadData();
   };
 
@@ -88,18 +100,25 @@ export default function ProductsPage() {
       {error && <div className="alert alert-warning">{error}</div>}
 
       <div className="card mt-4 p-4">
-        <div className="d-flex justify-content-between align-items-center mb-3">
+        <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
           <h4 className="mb-0">Furniture Products</h4>
-          <button
-            className="btn btn-maroon"
-            onClick={() => {
-              setEditing(null);
-              setShowModal(true);
-            }}
-          >
-            <i className="fas fa-plus me-2" />
-            Add Product
-          </button>
+          <div className="d-flex flex-wrap align-items-center gap-2">
+            <TableActionMenu
+              mode={actionMode}
+              onModeChange={setActionMode}
+              actions={PRODUCT_ACTIONS}
+            />
+            <button
+              className="btn btn-maroon"
+              onClick={() => {
+                setEditing(null);
+                setShowModal(true);
+              }}
+            >
+              <i className="fas fa-plus me-2" />
+              Add Product
+            </button>
+          </div>
         </div>
 
         <div className="table-responsive">
@@ -115,14 +134,24 @@ export default function ProductsPage() {
                 <th>Price</th>
                 <th>Stock</th>
                 <th>Status</th>
-                <th>Action</th>
               </tr>
             </thead>
             <tbody>
               {pg.paginatedItems.map((p) => {
                 const badge = getStockBadge(p.stock, p.reorder_level);
                 return (
-                  <tr key={p.id}>
+                  <tr
+                    key={p.id}
+                    className={actionMode ? `table-row-action table-row-action-${actionMode}` : ''}
+                    onClick={() => {
+                      if (actionMode === 'edit') {
+                        setEditing(p);
+                        setShowModal(true);
+                      } else if (actionMode === 'delete') {
+                        handleDelete(p.id);
+                      }
+                    }}
+                  >
                     <td>{p.code}</td>
                     <td>{p.name}</td>
                     <td>{p.category}</td>
@@ -134,29 +163,12 @@ export default function ProductsPage() {
                     <td>
                       <span className={`badge ${badge.cls}`}>{badge.label}</span>
                     </td>
-                    <td>
-                      <button
-                        className="btn btn-sm btn-primary me-2"
-                        onClick={() => {
-                          setEditing(p);
-                          setShowModal(true);
-                        }}
-                      >
-                        <i className="fas fa-edit" />
-                      </button>
-                      <button
-                        className="btn btn-sm btn-danger"
-                        onClick={() => handleDelete(p.id)}
-                      >
-                        <i className="fas fa-trash" />
-                      </button>
-                    </td>
                   </tr>
                 );
               })}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan="10" className="text-center text-muted py-4">
+                  <td colSpan="9" className="text-center text-muted py-4">
                     No products found.
                   </td>
                 </tr>

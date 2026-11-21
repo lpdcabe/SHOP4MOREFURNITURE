@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import Layout from '../components/Layout.jsx';
+import Layout, { useFeedback } from '../components/Layout.jsx';
 import StockTransactionModal from '../components/StockTransactionModal.jsx';
 import Pagination, { usePagination } from '../components/Pagination.jsx';
 import { api, getStockBadge } from '../services/api.js';
 
 export default function InventoryPage() {
+  const { notify, confirmAction } = useFeedback();
   const [activeTab, setActiveTab] = useState('list'); // 'list' | 'safety' | 'reorder'
   const [dash, setDash] = useState(null);
   const [suppliers, setSuppliers] = useState([]);
@@ -17,7 +18,6 @@ export default function InventoryPage() {
   const [modalMode, setModalMode] = useState(null); // 'in' | 'out' | null
   const [editingTx, setEditingTx] = useState(null);
   const [importing, setImporting] = useState(false);
-  const [message, setMessage] = useState({ type: '', text: '' });
   const fileRef = useRef(null);
 
   const loadAll = async () => {
@@ -34,9 +34,8 @@ export default function InventoryPage() {
       setCustomers(custs);
       setStockInList(ins);
       setStockOutList(outs);
-      setMessage((prev) => (prev.type === 'warning' ? { type: '', text: '' } : prev));
     } catch (err) {
-      setMessage({ type: 'warning', text: err.message });
+      notify(err.message, 'warning');
     }
   };
 
@@ -179,7 +178,6 @@ export default function InventoryPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     setImporting(true);
-    setMessage({ type: '', text: '' });
 
     try {
       const text = await file.text();
@@ -229,10 +227,10 @@ export default function InventoryPage() {
         }
         imported++;
       }
-      setMessage({ type: 'success', text: `Imported ${imported} Safety Stock records.` });
+      notify(`Imported ${imported} Safety Stock records.`);
       await loadAll();
     } catch (err) {
-      setMessage({ type: 'danger', text: err.message });
+      notify(err.message, 'danger');
     } finally {
       setImporting(false);
       e.target.value = '';
@@ -245,14 +243,18 @@ export default function InventoryPage() {
       : `SO-${String(stockOutList.length + 1).padStart(4, '0')}`;
 
   const handleDeleteStockIn = async (id) => {
-    if (!window.confirm('Delete this Stock In transaction?')) return;
+    const ok = await confirmAction({ message: 'Are you sure you want to delete this Stock In transaction?' });
+    if (!ok) return;
     await api.deleteStockIn(id);
+    notify('Stock In transaction deleted.');
     await loadAll();
   };
 
   const handleDeleteStockOut = async (id) => {
-    if (!window.confirm('Delete this Stock Out transaction?')) return;
+    const ok = await confirmAction({ message: 'Are you sure you want to delete this Stock Out transaction?' });
+    if (!ok) return;
     await api.deleteStockOut(id);
+    notify('Stock Out transaction deleted.');
     await loadAll();
   };
 
@@ -277,33 +279,31 @@ export default function InventoryPage() {
       searchPlaceholder="Search Product"
       filters={pageFilters}
     >
-      {message.text && <div className={`alert alert-${message.type}`}>{message.text}</div>}
-
       {/* Inventory Sub-navigation Tabs */}
-      <div className="d-flex flex-wrap gap-2 mt-1">
+      <div className="page-tabs mt-1">
         <button
           type="button"
-          className={`btn ${activeTab === 'list' ? 'btn-maroon' : 'btn-outline-secondary'}`}
+          className={`page-tab-btn ${activeTab === 'list' ? 'active' : ''}`}
           onClick={() => setActiveTab('list')}
         >
-          <i className="fas fa-boxes me-2" />
-          Inventory List
+          <i className="fas fa-boxes" />
+          <span>Inventory List</span>
         </button>
         <button
           type="button"
-          className={`btn ${activeTab === 'safety' ? 'btn-maroon' : 'btn-outline-secondary'}`}
+          className={`page-tab-btn ${activeTab === 'safety' ? 'active' : ''}`}
           onClick={() => setActiveTab('safety')}
         >
-          <i className="fas fa-shield-halved me-2" />
-          Safety Stock
+          <i className="fas fa-shield-halved" />
+          <span>Safety Stock</span>
         </button>
         <button
           type="button"
-          className={`btn ${activeTab === 'reorder' ? 'btn-maroon' : 'btn-outline-secondary'}`}
+          className={`page-tab-btn ${activeTab === 'reorder' ? 'active' : ''}`}
           onClick={() => setActiveTab('reorder')}
         >
-          <i className="fas fa-bell me-2" />
-          Reorder Point
+          <i className="fas fa-bell" />
+          <span>Reorder Point</span>
         </button>
       </div>
 
@@ -313,7 +313,7 @@ export default function InventoryPage() {
           <div className="card mt-3 p-4">
             <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
               <h4 className="mb-0">Inventory List</h4>
-              <div className="d-flex flex-wrap align-items-center gap-2">
+              <div className="d-flex align-items-center gap-2 mobile-action-row">
                 <button
                   type="button"
                   className="btn btn-outline-secondary"
@@ -322,7 +322,7 @@ export default function InventoryPage() {
                     setModalMode('in');
                   }}
                 >
-                  <i className="fas fa-arrow-down me-2" />
+                  <i className="fas fa-arrow-down me-1" />
                   Stock In
                 </button>
                 <button
@@ -333,11 +333,11 @@ export default function InventoryPage() {
                     setModalMode('out');
                   }}
                 >
-                  <i className="fas fa-arrow-up me-2" />
+                  <i className="fas fa-arrow-up me-1" />
                   Stock Out
                 </button>
                 <button className="btn btn-maroon" onClick={exportCsv}>
-                  <i className="fas fa-file-export me-2" />
+                  <i className="fas fa-file-export me-1" />
                   Export CSV
                 </button>
               </div>
@@ -392,7 +392,6 @@ export default function InventoryPage() {
                         <th>Supplier</th>
                         <th>Product</th>
                         <th>Qty</th>
-                        <th>Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -403,25 +402,6 @@ export default function InventoryPage() {
                           <td>{t.supplier_name}</td>
                           <td>{t.product_name}</td>
                           <td>{t.quantity}</td>
-                          <td>
-                            <button
-                              className="btn btn-primary btn-sm me-1"
-                              title="Edit"
-                              onClick={() => {
-                                setEditingTx(t);
-                                setModalMode('in');
-                              }}
-                            >
-                              <i className="fas fa-edit" />
-                            </button>
-                            <button
-                              className="btn btn-danger btn-sm"
-                              title="Delete"
-                              onClick={() => handleDeleteStockIn(t.id)}
-                            >
-                              <i className="fas fa-trash" />
-                            </button>
-                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -443,7 +423,6 @@ export default function InventoryPage() {
                         <th>Customer</th>
                         <th>Product</th>
                         <th>Qty</th>
-                        <th>Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -454,25 +433,6 @@ export default function InventoryPage() {
                           <td>{t.customer_name}</td>
                           <td>{t.product_name}</td>
                           <td>{t.quantity}</td>
-                          <td>
-                            <button
-                              className="btn btn-primary btn-sm me-1"
-                              title="Edit"
-                              onClick={() => {
-                                setEditingTx(t);
-                                setModalMode('out');
-                              }}
-                            >
-                              <i className="fas fa-edit" />
-                            </button>
-                            <button
-                              className="btn btn-danger btn-sm"
-                              title="Delete"
-                              onClick={() => handleDeleteStockOut(t.id)}
-                            >
-                              <i className="fas fa-trash" />
-                            </button>
-                          </td>
                         </tr>
                       ))}
                     </tbody>

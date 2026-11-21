@@ -1,11 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
-import Layout from '../components/Layout.jsx';
+import Layout, { useFeedback } from '../components/Layout.jsx';
 import Pagination, { usePagination } from '../components/Pagination.jsx';
+import TableActionMenu from '../components/TableActionMenu.jsx';
 import { api, formatPeso, getNextCode } from '../services/api.js';
+
+const RECEIVING_ACTIONS = [
+  { key: 'edit', label: 'Edit', icon: 'fas fa-edit', variant: 'primary' },
+  { key: 'delete', label: 'Delete', icon: 'fas fa-trash', variant: 'danger' }
+];
 
 const today = () => new Date().toISOString().slice(0, 10);
 
 export default function ReceivingPage() {
+  const { notify, confirmAction } = useFeedback();
   const [records, setRecords] = useState([]);
   const [pos, setPos] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
@@ -14,7 +21,7 @@ export default function ReceivingPage() {
   const [statusFilter, setStatusFilter] = useState('All');
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [message, setMessage] = useState({ type: '', text: '' });
+  const [actionMode, setActionMode] = useState(null);
   const [form, setForm] = useState({
     receiving_no: 'GR-0001',
     date_received: today(),
@@ -37,7 +44,7 @@ export default function ReceivingPage() {
       setPos(poList);
       setSuppliers(supList);
     } catch (err) {
-      setMessage({ type: 'warning', text: err.message });
+      notify(err.message, 'warning');
     }
   };
 
@@ -113,21 +120,23 @@ export default function ReceivingPage() {
       const status = form.condition === 'Good' ? 'Received' : 'Inspection';
       if (editing) {
         await api.updateGoodsReceiving(editing.id, { ...form, status });
-        setMessage({ type: 'success', text: 'Goods receiving record updated.' });
+        notify('Goods receiving record updated.');
       } else {
         await api.createGoodsReceiving({ ...form, status });
-        setMessage({ type: 'success', text: 'Goods receiving record saved.' });
+        notify('Goods receiving record saved.');
       }
       setShowModal(false);
       await load();
     } catch (err) {
-      setMessage({ type: 'danger', text: err.message });
+      notify(err.message, 'danger');
     }
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Delete this receiving record?')) return;
+    const ok = await confirmAction({ message: 'Are you sure you want to delete this receiving record?' });
+    if (!ok) return;
     await api.deleteGoodsReceiving(id);
+    notify('Receiving record deleted.');
     await load();
   };
 
@@ -159,15 +168,20 @@ export default function ReceivingPage() {
       searchPlaceholder="Search Receiving No."
       filters={pageFilters}
     >
-      {message.text && <div className={`alert alert-${message.type}`}>{message.text}</div>}
-
       <div className="card mt-2 p-4">
-        <div className="d-flex justify-content-between align-items-center mb-3">
+        <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
           <h4 className="mb-0">Receiving History</h4>
-          <button className="btn btn-maroon" onClick={() => openModal()}>
-            <i className="fas fa-box-open me-2" />
-            Receive Goods
-          </button>
+          <div className="d-flex flex-wrap align-items-center gap-2">
+            <TableActionMenu
+              mode={actionMode}
+              onModeChange={setActionMode}
+              actions={RECEIVING_ACTIONS}
+            />
+            <button className="btn btn-maroon" onClick={() => openModal()}>
+              <i className="fas fa-box-open me-2" />
+              Receive Goods
+            </button>
+          </div>
         </div>
 
         <div className="table-responsive">
@@ -180,12 +194,18 @@ export default function ReceivingPage() {
                 <th>Date</th>
                 <th>Condition</th>
                 <th>Status</th>
-                <th>Action</th>
               </tr>
             </thead>
             <tbody>
               {pg.paginatedItems.map((r) => (
-                <tr key={r.id}>
+                <tr
+                  key={r.id}
+                  className={actionMode ? `table-row-action table-row-action-${actionMode}` : ''}
+                  onClick={() => {
+                    if (actionMode === 'edit') openModal(r);
+                    else if (actionMode === 'delete') handleDelete(r.id);
+                  }}
+                >
                   <td>{r.receiving_no}</td>
                   <td>{r.po_no}</td>
                   <td>{r.supplier_name}</td>
@@ -200,27 +220,11 @@ export default function ReceivingPage() {
                       {r.status}
                     </span>
                   </td>
-                  <td>
-                    <button
-                      className="btn btn-primary btn-sm me-2"
-                      title="Edit"
-                      onClick={() => openModal(r)}
-                    >
-                      <i className="fas fa-edit" />
-                    </button>
-                    <button
-                      className="btn btn-danger btn-sm"
-                      title="Delete"
-                      onClick={() => handleDelete(r.id)}
-                    >
-                      <i className="fas fa-trash" />
-                    </button>
-                  </td>
                 </tr>
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan="7" className="text-center text-muted py-4">
+                  <td colSpan="6" className="text-center text-muted py-4">
                     No receiving records found.
                   </td>
                 </tr>

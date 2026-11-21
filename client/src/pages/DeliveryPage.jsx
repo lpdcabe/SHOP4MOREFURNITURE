@@ -1,18 +1,26 @@
 import { useEffect, useMemo, useState } from 'react';
-import Layout from '../components/Layout.jsx';
+import Layout, { useFeedback } from '../components/Layout.jsx';
 import Pagination, { usePagination } from '../components/Pagination.jsx';
+import TableActionMenu from '../components/TableActionMenu.jsx';
 import { api, getNextCode } from '../services/api.js';
+
+const DELIVERY_ACTIONS = [
+  { key: 'edit', label: 'Edit', icon: 'fas fa-edit', variant: 'primary' },
+  { key: 'print', label: 'Print', icon: 'fas fa-print', variant: 'success' },
+  { key: 'delete', label: 'Delete', icon: 'fas fa-trash', variant: 'danger' }
+];
 
 const today = () => new Date().toISOString().slice(0, 10);
 
 export default function DeliveryPage() {
+  const { notify, confirmAction } = useFeedback();
   const [receipts, setReceipts] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [message, setMessage] = useState({ type: '', text: '' });
+  const [actionMode, setActionMode] = useState(null);
   const [form, setForm] = useState({
     dr_no: 'DR-0001',
     delivery_date: today(),
@@ -29,7 +37,7 @@ export default function DeliveryPage() {
       setReceipts(drs);
       setCustomers(custs);
     } catch (err) {
-      setMessage({ type: 'warning', text: err.message });
+      notify(err.message, 'warning');
     }
   };
 
@@ -81,32 +89,23 @@ export default function DeliveryPage() {
     try {
       if (editing) {
         await api.updateDeliveryReceipt(editing.id, form);
-        setMessage({ type: 'success', text: 'Delivery receipt updated.' });
+        notify('Delivery receipt updated.');
       } else {
         await api.createDeliveryReceipt(form);
-        setMessage({ type: 'success', text: 'Delivery receipt saved.' });
+        notify('Delivery receipt saved.');
       }
       setShowModal(false);
       await load();
     } catch (err) {
-      setMessage({ type: 'danger', text: err.message });
+      notify(err.message, 'danger');
     }
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Delete this delivery receipt?')) return;
+    const ok = await confirmAction({ message: 'Are you sure you want to delete this delivery receipt?' });
+    if (!ok) return;
     await api.deleteDeliveryReceipt(id);
-    await load();
-  };
-
-  const advanceStatus = async (dr) => {
-    const next =
-      dr.status === 'Preparing'
-        ? 'Out for Delivery'
-        : dr.status === 'Out for Delivery'
-        ? 'Delivered'
-        : 'Preparing';
-    await api.updateDeliveryReceipt(dr.id, { status: next });
+    notify('Delivery receipt deleted.');
     await load();
   };
 
@@ -130,15 +129,20 @@ export default function DeliveryPage() {
       searchPlaceholder="Search Delivery Receipt"
       filters={pageFilters}
     >
-      {message.text && <div className={`alert alert-${message.type}`}>{message.text}</div>}
-
       <div className="card mt-2 p-4">
-        <div className="d-flex justify-content-between align-items-center mb-3">
+        <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
           <h4 className="mb-0">Delivery History</h4>
-          <button className="btn btn-maroon" onClick={() => openModal()}>
-            <i className="fas fa-truck-fast me-2" />
-            Create Delivery Receipt
-          </button>
+          <div className="d-flex flex-wrap align-items-center gap-2">
+            <TableActionMenu
+              mode={actionMode}
+              onModeChange={setActionMode}
+              actions={DELIVERY_ACTIONS}
+            />
+            <button className="btn btn-maroon" onClick={() => openModal()}>
+              <i className="fas fa-truck-fast me-2" />
+              Create Delivery Receipt
+            </button>
+          </div>
         </div>
 
         <div className="table-responsive">
@@ -150,7 +154,6 @@ export default function DeliveryPage() {
                 <th>Date</th>
                 <th>Driver</th>
                 <th>Status</th>
-                <th>Action</th>
               </tr>
             </thead>
             <tbody>
@@ -162,7 +165,15 @@ export default function DeliveryPage() {
                     ? 'bg-warning text-dark'
                     : 'bg-secondary';
                 return (
-                  <tr key={dr.id}>
+                  <tr
+                    key={dr.id}
+                    className={actionMode ? `table-row-action table-row-action-${actionMode}` : ''}
+                    onClick={() => {
+                      if (actionMode === 'edit') openModal(dr);
+                      else if (actionMode === 'print') window.print();
+                      else if (actionMode === 'delete') handleDelete(dr.id);
+                    }}
+                  >
                     <td>{dr.dr_no}</td>
                     <td>{dr.customer_name}</td>
                     <td>{dr.delivery_date}</td>
@@ -170,42 +181,12 @@ export default function DeliveryPage() {
                     <td>
                       <span className={`badge ${badgeCls}`}>{dr.status}</span>
                     </td>
-                    <td>
-                      <button
-                        className="btn btn-primary btn-sm me-2"
-                        title="Edit Delivery Receipt"
-                        onClick={() => openModal(dr)}
-                      >
-                        <i className="fas fa-edit" />
-                      </button>
-                      <button
-                        className="btn btn-info btn-sm text-white me-2"
-                        title="Cycle Status"
-                        onClick={() => advanceStatus(dr)}
-                      >
-                        <i className="fas fa-sync-alt" />
-                      </button>
-                      <button
-                        className="btn btn-success btn-sm me-2"
-                        title="Print"
-                        onClick={() => window.print()}
-                      >
-                        <i className="fas fa-print" />
-                      </button>
-                      <button
-                        className="btn btn-danger btn-sm"
-                        title="Delete"
-                        onClick={() => handleDelete(dr.id)}
-                      >
-                        <i className="fas fa-trash" />
-                      </button>
-                    </td>
                   </tr>
                 );
               })}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan="6" className="text-center text-muted py-4">
+                  <td colSpan="5" className="text-center text-muted py-4">
                     No delivery receipts found.
                   </td>
                 </tr>
@@ -242,7 +223,7 @@ export default function DeliveryPage() {
                 <div className="col-md-6">
                   <label className="form-label">Customer</label>
                   <select
-                    className="form-control"
+                    className="form-select"
                     value={form.customer_name}
                     onChange={(e) => setForm({ ...form, customer_name: e.target.value })}
                   >
@@ -274,7 +255,7 @@ export default function DeliveryPage() {
                 <div className="col-md-4">
                   <label className="form-label">Status</label>
                   <select
-                    className="form-control"
+                    className="form-select"
                     value={form.status}
                     onChange={(e) => setForm({ ...form, status: e.target.value })}
                   >

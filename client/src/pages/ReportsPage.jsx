@@ -85,29 +85,29 @@ export default function ReportsPage() {
     <Layout title="Reports & Analytics">
       {error && <div className="alert alert-warning">{error}</div>}
 
-      <div className="row mt-4 g-4">
-        <div className="col-md-3">
+      <div className="row mt-2 g-3 g-md-4">
+        <div className="col-lg-3 col-6">
           <div className="card dashboard-card">
             <i className="fas fa-box" />
             <h3>{summary.totalStock}</h3>
             <p>Total Inventory</p>
           </div>
         </div>
-        <div className="col-md-3">
+        <div className="col-lg-3 col-6">
           <div className="card dashboard-card">
             <i className="fas fa-arrow-down" />
             <h3>{summary.totalStockInQty}</h3>
             <p>Stock In</p>
           </div>
         </div>
-        <div className="col-md-3">
+        <div className="col-lg-3 col-6">
           <div className="card dashboard-card">
             <i className="fas fa-arrow-up" />
             <h3>{summary.totalStockOutQty}</h3>
             <p>Stock Out</p>
           </div>
         </div>
-        <div className="col-md-3">
+        <div className="col-lg-3 col-6">
           <div className="card dashboard-card">
             <i className="fas fa-coins" />
             <h3>{formatPeso(summary.totalSalesAmount)}</h3>

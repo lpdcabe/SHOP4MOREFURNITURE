@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import Layout from '../components/Layout.jsx';
+import Layout, { useFeedback } from '../components/Layout.jsx';
 import { api } from '../services/api.js';
 
 export default function SettingsPage() {
+  const { notify } = useFeedback();
   const [settings, setSettings] = useState({
     company_name: 'Shop 4 More Furniture',
     business_address: 'Angeles City, Pampanga',
@@ -18,7 +19,6 @@ export default function SettingsPage() {
     language: 'English',
     time_zone: 'GMT +8 Philippines'
   });
-  const [message, setMessage] = useState({ type: '', text: '' });
 
   useEffect(() => {
     api
@@ -33,16 +33,14 @@ export default function SettingsPage() {
     try {
       const updated = await api.updateSettings(settings);
       setSettings(updated);
-      setMessage({ type: 'success', text: 'Settings saved to Supabase.' });
+      notify('Settings saved to Supabase.');
     } catch (err) {
-      setMessage({ type: 'danger', text: err.message });
+      notify(err.message, 'danger');
     }
   };
 
   return (
     <Layout title="System Settings">
-      {message.text && <div className={`alert alert-${message.type}`}>{message.text}</div>}
-
       <div className="row mt-4 g-4">
         <div className="col-12">
           <div className="card p-4">

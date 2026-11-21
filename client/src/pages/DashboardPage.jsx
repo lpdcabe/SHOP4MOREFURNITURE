@@ -97,8 +97,8 @@ export default function DashboardPage() {
     <Layout title="Dashboard">
       {error && <div className="alert alert-warning">{error}</div>}
 
-      <div className="row g-4 mt-1">
-        <div className="col-lg-3 col-md-6">
+      <div className="row g-3 g-md-4 mt-1">
+        <div className="col-lg-3 col-6">
           <div
             className="card dashboard-card interactive-card"
             onClick={() => navigate('/products')}
@@ -110,7 +110,7 @@ export default function DashboardPage() {
             <p>Total Products</p>
           </div>
         </div>
-        <div className="col-lg-3 col-md-6">
+        <div className="col-lg-3 col-6">
           <div
             className="card dashboard-card interactive-card"
             onClick={() => navigate('/inventory')}
@@ -122,7 +122,7 @@ export default function DashboardPage() {
             <p>Current Stock</p>
           </div>
         </div>
-        <div className="col-lg-3 col-md-6">
+        <div className="col-lg-3 col-6">
           <div
             className="card dashboard-card interactive-card"
             onClick={() => navigate('/inventory')}
@@ -134,7 +134,7 @@ export default function DashboardPage() {
             <p>Low Stock</p>
           </div>
         </div>
-        <div className="col-lg-3 col-md-6">
+        <div className="col-lg-3 col-6">
           <div
             className="card dashboard-card interactive-card"
             onClick={() => navigate('/suppliers')}

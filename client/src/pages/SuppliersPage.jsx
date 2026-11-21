@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import Layout from '../components/Layout.jsx';
+import Layout, { useFeedback } from '../components/Layout.jsx';
 import Pagination, { usePagination } from '../components/Pagination.jsx';
+import TableActionMenu from '../components/TableActionMenu.jsx';
 import { api, getNextCode } from '../services/api.js';
+
+const SUPPLIER_ACTIONS = [
+  { key: 'edit', label: 'Edit', icon: 'fas fa-edit', variant: 'primary' },
+  { key: 'delete', label: 'Delete', icon: 'fas fa-trash', variant: 'danger' }
+];
 
 const EMPTY = {
   code: '',
@@ -14,11 +20,13 @@ const EMPTY = {
 };
 
 export default function SuppliersPage() {
+  const { notify, confirmAction } = useFeedback();
   const [suppliers, setSuppliers] = useState([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [actionMode, setActionMode] = useState(null);
   const [form, setForm] = useState(EMPTY);
   const [error, setError] = useState('');
 
@@ -58,16 +66,20 @@ export default function SuppliersPage() {
     e.preventDefault();
     if (editing) {
       await api.updateSupplier(editing.id, form);
+      notify('Supplier updated.');
     } else {
       await api.createSupplier(form);
+      notify('Supplier added.');
     }
     setShowModal(false);
     await load();
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Delete this supplier?')) return;
+    const ok = await confirmAction({ message: 'Are you sure you want to delete this supplier?' });
+    if (!ok) return;
     await api.deleteSupplier(id);
+    notify('Supplier deleted.');
     await load();
   };
 
@@ -94,12 +106,19 @@ export default function SuppliersPage() {
       {error && <div className="alert alert-warning">{error}</div>}
 
       <div className="card mt-4 p-4">
-        <div className="d-flex justify-content-between align-items-center mb-3">
+        <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
           <h4 className="mb-0">Supplier Directory</h4>
-          <button className="btn btn-maroon" onClick={() => openModal()}>
-            <i className="fas fa-plus me-2" />
-            Add Supplier
-          </button>
+          <div className="d-flex flex-wrap align-items-center gap-2">
+            <TableActionMenu
+              mode={actionMode}
+              onModeChange={setActionMode}
+              actions={SUPPLIER_ACTIONS}
+            />
+            <button className="btn btn-maroon" onClick={() => openModal()}>
+              <i className="fas fa-plus me-2" />
+              Add Supplier
+            </button>
+          </div>
         </div>
 
         <div className="table-responsive">
@@ -113,12 +132,18 @@ export default function SuppliersPage() {
                 <th>Email</th>
                 <th>Address</th>
                 <th>Status</th>
-                <th>Action</th>
               </tr>
             </thead>
             <tbody>
               {pg.paginatedItems.map((s) => (
-                <tr key={s.id}>
+                <tr
+                  key={s.id}
+                  className={actionMode ? `table-row-action table-row-action-${actionMode}` : ''}
+                  onClick={() => {
+                    if (actionMode === 'edit') openModal(s);
+                    else if (actionMode === 'delete') handleDelete(s.id);
+                  }}
+                >
                   <td>{s.code}</td>
                   <td>{s.company_name}</td>
                   <td>{s.contact_person}</td>
@@ -133,20 +158,6 @@ export default function SuppliersPage() {
                     >
                       {s.status}
                     </span>
-                  </td>
-                  <td>
-                    <button
-                      className="btn btn-primary btn-sm me-2"
-                      onClick={() => openModal(s)}
-                    >
-                      <i className="fas fa-edit" />
-                    </button>
-                    <button
-                      className="btn btn-danger btn-sm"
-                      onClick={() => handleDelete(s.id)}
-                    >
-                      <i className="fas fa-trash" />
-                    </button>
                   </td>
                 </tr>
               ))}
@@ -208,7 +219,7 @@ export default function SuppliersPage() {
                 <div className="col-md-6">
                   <label className="form-label">Status</label>
                   <select
-                    className="form-control"
+                    className="form-select"
                     value={form.status}
                     onChange={(e) => setForm({ ...form, status: e.target.value })}
                   >

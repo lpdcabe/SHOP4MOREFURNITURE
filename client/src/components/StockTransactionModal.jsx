@@ -158,7 +158,7 @@ export default function StockTransactionModal({
             <div className="col-md-6">
               <label className="form-label">{isIn ? 'Supplier' : 'Customer'}</label>
               <select
-                className="form-control"
+                className="form-select"
                 value={form.party_name}
                 onChange={(e) => setForm({ ...form, party_name: e.target.value })}
               >
@@ -175,7 +175,7 @@ export default function StockTransactionModal({
             <div className="col-md-6">
               <label className="form-label">Product</label>
               <select
-                className="form-control"
+                className="form-select"
                 value={form.product_name}
                 onChange={(e) => handleProductChange(e.target.value)}
               >

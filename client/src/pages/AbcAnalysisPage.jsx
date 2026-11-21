@@ -1,17 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import Layout from '../components/Layout.jsx';
+import Layout, { useFeedback } from '../components/Layout.jsx';
 import ChartCanvas from '../components/ChartCanvas.jsx';
 import Pagination, { usePagination } from '../components/Pagination.jsx';
 import { api, formatPeso } from '../services/api.js';
 
 export default function AbcAnalysisPage() {
+  const { notify } = useFeedback();
   const [abcItems, setAbcItems] = useState([]);
   const [activeTab, setActiveTab] = useState('abc'); // 'abc' | 'summary'
   const [search, setSearch] = useState('');
   const [classFilter, setClassFilter] = useState('All');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [importing, setImporting] = useState(false);
-  const [message, setMessage] = useState({ type: '', text: '' });
   const fileRef = useRef(null);
 
   const load = async () => {
@@ -19,7 +19,7 @@ export default function AbcAnalysisPage() {
       const d = await api.dashboard();
       setAbcItems(d.abcItems || []);
     } catch (err) {
-      setMessage({ type: 'warning', text: err.message });
+      notify(err.message, 'warning');
     }
   };
 
@@ -90,7 +90,6 @@ export default function AbcAnalysisPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     setImporting(true);
-    setMessage({ type: '', text: '' });
 
     try {
       const text = await file.text();
@@ -121,10 +120,10 @@ export default function AbcAnalysisPage() {
         });
         imported++;
       }
-      setMessage({ type: 'success', text: `Imported ${imported} items into ABC Analysis.` });
+      notify(`Imported ${imported} items into ABC Analysis.`);
       await load();
     } catch (err) {
-      setMessage({ type: 'danger', text: err.message });
+      notify(err.message, 'danger');
     } finally {
       setImporting(false);
       e.target.value = '';
@@ -188,8 +187,6 @@ export default function AbcAnalysisPage() {
       searchPlaceholder="Search Item or Category..."
       filters={pageFilters}
     >
-      {message.text && <div className={`alert alert-${message.type}`}>{message.text}</div>}
-
       <div className="row mt-2 g-4">
         <div className="col-md-4">
           <div
@@ -229,22 +226,22 @@ export default function AbcAnalysisPage() {
         </div>
       </div>
 
-      <div className="d-flex flex-wrap gap-2 mt-4">
+      <div className="page-tabs mt-4">
         <button
           type="button"
-          className={`btn ${activeTab === 'abc' ? 'btn-maroon' : 'btn-outline-secondary'}`}
+          className={`page-tab-btn ${activeTab === 'abc' ? 'active' : ''}`}
           onClick={() => setActiveTab('abc')}
         >
-          <i className="fas fa-chart-pie me-2" />
-          ABC Analysis
+          <i className="fas fa-chart-pie" />
+          <span>ABC Analysis</span>
         </button>
         <button
           type="button"
-          className={`btn ${activeTab === 'summary' ? 'btn-maroon' : 'btn-outline-secondary'}`}
+          className={`page-tab-btn ${activeTab === 'summary' ? 'active' : ''}`}
           onClick={() => setActiveTab('summary')}
         >
-          <i className="fas fa-list-ol me-2" />
-          Summary
+          <i className="fas fa-list-ol" />
+          <span>Summary</span>
         </button>
       </div>
 

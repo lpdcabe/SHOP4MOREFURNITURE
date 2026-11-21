@@ -1,11 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
-import Layout from '../components/Layout.jsx';
+import Layout, { useFeedback } from '../components/Layout.jsx';
 import Pagination, { usePagination } from '../components/Pagination.jsx';
+import TableActionMenu from '../components/TableActionMenu.jsx';
 import { api, formatPeso, getNextCode } from '../services/api.js';
+
+const PO_ACTIONS = [
+  { key: 'edit', label: 'Edit', icon: 'fas fa-edit', variant: 'primary' },
+  { key: 'print', label: 'Print', icon: 'fas fa-print', variant: 'success' },
+  { key: 'delete', label: 'Delete', icon: 'fas fa-trash', variant: 'danger' }
+];
 
 const today = () => new Date().toISOString().slice(0, 10);
 
 export default function PurchaseOrdersPage() {
+  const { notify, confirmAction } = useFeedback();
   const [orders, setOrders] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [search, setSearch] = useState('');
@@ -13,6 +21,7 @@ export default function PurchaseOrdersPage() {
   const [supplierFilter, setSupplierFilter] = useState('All');
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [actionMode, setActionMode] = useState(null);
   const [form, setForm] = useState({
     po_no: '',
     supplier_name: '',
@@ -89,16 +98,20 @@ export default function PurchaseOrdersPage() {
     };
     if (editing) {
       await api.updatePurchaseOrder(editing.id, payload);
+      notify('Purchase order updated.');
     } else {
       await api.createPurchaseOrder(payload);
+      notify('Purchase order created.');
     }
     setShowModal(false);
     await load();
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Delete this purchase order?')) return;
+    const ok = await confirmAction({ message: 'Are you sure you want to delete this purchase order?' });
+    if (!ok) return;
     await api.deletePurchaseOrder(id);
+    notify('Purchase order deleted.');
     await load();
   };
 
@@ -132,12 +145,19 @@ export default function PurchaseOrdersPage() {
       {error && <div className="alert alert-warning">{error}</div>}
 
       <div className="card mt-4 p-4">
-        <div className="d-flex justify-content-between align-items-center mb-3">
+        <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
           <h4 className="mb-0">Purchase Order List</h4>
-          <button className="btn btn-maroon" onClick={openCreate}>
-            <i className="fas fa-plus me-2" />
-            Create Purchase Order
-          </button>
+          <div className="d-flex flex-wrap align-items-center gap-2">
+            <TableActionMenu
+              mode={actionMode}
+              onModeChange={setActionMode}
+              actions={PO_ACTIONS}
+            />
+            <button className="btn btn-maroon" onClick={openCreate}>
+              <i className="fas fa-plus me-2" />
+              Create Purchase Order
+            </button>
+          </div>
         </div>
 
         <div className="table-responsive">
@@ -150,7 +170,6 @@ export default function PurchaseOrdersPage() {
                 <th>Expected Delivery</th>
                 <th>Total Amount</th>
                 <th>Status</th>
-                <th>Action</th>
               </tr>
             </thead>
             <tbody>
@@ -162,7 +181,15 @@ export default function PurchaseOrdersPage() {
                     ? 'bg-warning text-dark'
                     : 'bg-danger';
                 return (
-                  <tr key={po.id}>
+                  <tr
+                    key={po.id}
+                    className={actionMode ? `table-row-action table-row-action-${actionMode}` : ''}
+                    onClick={() => {
+                      if (actionMode === 'edit') openEdit(po);
+                      else if (actionMode === 'print') window.print();
+                      else if (actionMode === 'delete') handleDelete(po.id);
+                    }}
+                  >
                     <td>{po.po_no}</td>
                     <td>{po.supplier_name}</td>
                     <td>{po.order_date}</td>
@@ -170,29 +197,6 @@ export default function PurchaseOrdersPage() {
                     <td>{formatPeso(po.total_amount)}</td>
                     <td>
                       <span className={`badge ${badgeCls}`}>{po.status}</span>
-                    </td>
-                    <td>
-                      <button
-                        className="btn btn-primary btn-sm me-2"
-                        title="Edit Purchase Order"
-                        onClick={() => openEdit(po)}
-                      >
-                        <i className="fas fa-edit" />
-                      </button>
-                      <button
-                        className="btn btn-success btn-sm me-2"
-                        title="Print"
-                        onClick={() => window.print()}
-                      >
-                        <i className="fas fa-print" />
-                      </button>
-                      <button
-                        className="btn btn-danger btn-sm"
-                        title="Delete Purchase Order"
-                        onClick={() => handleDelete(po.id)}
-                      >
-                        <i className="fas fa-trash" />
-                      </button>
                     </td>
                   </tr>
                 );
@@ -221,7 +225,7 @@ export default function PurchaseOrdersPage() {
                 <div className={editing ? 'col-md-6' : 'col-12'}>
                   <label className="form-label">Supplier</label>
                   <select
-                    className="form-control"
+                    className="form-select"
                     value={form.supplier_name}
                     onChange={(e) => setForm({ ...form, supplier_name: e.target.value })}
                   >
@@ -264,7 +268,7 @@ export default function PurchaseOrdersPage() {
                 <div className="col-md-6">
                   <label className="form-label">Status</label>
                   <select
-                    className="form-control"
+                    className="form-select"
                     value={form.status}
                     onChange={(e) => setForm({ ...form, status: e.target.value })}
                   >
